@@ -56,8 +56,8 @@ def generate_launch_description():
     description='Whether to use Gazebo gpu_ray or ray')
   declare_organize_cloud_cmd = DeclareLaunchArgument(
     'organize_cloud',
-    default_value='False',
-    description='Organize PointCloud2 into 2D array with NaN placeholders, otherwise 1D array and leave out invlaid points')
+    default_value='True',
+    description='Organize PointCloud2 into 2D array with NaN placeholders (RoboSense style: height=samples, width=lasers)')
   gpu = LaunchConfiguration('gpu')
   organize_cloud = LaunchConfiguration('organize_cloud')
   robot_description = Command(['xacro',' ', xacro_path, ' gpu:=', gpu, ' organize_cloud:=', organize_cloud])

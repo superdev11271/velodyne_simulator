@@ -167,8 +167,8 @@ void GazeboRosVelodyneLaser::OnScan(ConstLaserScanStampedPtr& _msg)
   const double MAX_RANGE = std::min(max_range_, maxRange);
   const double MIN_INTENSITY = min_intensity_;
 
-  // Populate message fields
-  const uint32_t POINT_STEP = 22;
+  // RoboSense-style PointCloud2: x,y,z,intensity (float32), ring (uint16), timestamp (float64)
+  const uint32_t POINT_STEP = 26;
   sensor_msgs::msg::PointCloud2 msg;
   msg.header.frame_id = frame_name_;
   msg.header.stamp.sec = _msg->time().sec();
@@ -194,81 +194,98 @@ void GazeboRosVelodyneLaser::OnScan(ConstLaserScanStampedPtr& _msg)
   msg.fields[4].offset = 16;
   msg.fields[4].datatype = sensor_msgs::msg::PointField::UINT16;
   msg.fields[4].count = 1;
-  msg.fields[5].name = "time";
+  msg.fields[5].name = "timestamp";
   msg.fields[5].offset = 18;
-  msg.fields[5].datatype = sensor_msgs::msg::PointField::FLOAT32;
+  msg.fields[5].datatype = sensor_msgs::msg::PointField::FLOAT64;
   msg.fields[5].count = 1;
-  msg.data.resize(verticalRangeCount * rangeCount * POINT_STEP);
-
-  int i, j;
-  uint8_t *ptr = msg.data.data();
-  for (i = 0; i < rangeCount; i++) {
-    for (j = 0; j < verticalRangeCount; j++) {
-
-      // Range
-      double r = _msg->scan().ranges(i + j * rangeCount);
-      // Intensity
-      double intensity = _msg->scan().intensities(i + j * rangeCount);
-      // Ignore points that lay outside range bands or optionally, beneath a
-      // minimum intensity level.
-      if ((MIN_RANGE >= r) || (r >= MAX_RANGE) || (intensity < MIN_INTENSITY) ) {
-        if (!organize_cloud_) {
-          continue;
-        }
-      }
-
-      // Noise
-      if (gaussian_noise_ != 0.0) {
-        r += gaussianKernel(0,gaussian_noise_);
-      }
-
-      // Get angles of ray to get xyz for point
-      double yAngle;
-      double pAngle;
-
-      if (rangeCount > 1) {
-        yAngle = i * yDiff / (rangeCount -1) + minAngle.Radian();
-      } else {
-        yAngle = minAngle.Radian();
-      }
-
-      if (verticalRayCount > 1) {
-        pAngle = j * pDiff / (verticalRangeCount -1) + verticalMinAngle.Radian();
-      } else {
-        pAngle = verticalMinAngle.Radian();
-      }
-
-      // pAngle is rotated by yAngle:
-      if ((MIN_RANGE < r) && (r < MAX_RANGE)) {
-        *((float*)(ptr + 0)) = r * cos(pAngle) * cos(yAngle); // x
-        *((float*)(ptr + 4)) = r * cos(pAngle) * sin(yAngle); // y
-        *((float*)(ptr + 8)) = r * sin(pAngle); // z
-        *((float*)(ptr + 12)) = intensity; // intensity
-        *((uint16_t*)(ptr + 16)) = j; // ring
-        *((float*)(ptr + 18)) = 0.0; // time
-        ptr += POINT_STEP;
-      } else if (organize_cloud_) {
-        *((float*)(ptr + 0)) = nanf(""); // x
-        *((float*)(ptr + 4)) = nanf(""); // y
-        *((float*)(ptr + 8)) = nanf(""); // x
-        *((float*)(ptr + 12)) = nanf(""); // intensity
-        *((uint16_t*)(ptr + 16)) = j; // ring
-        *((float*)(ptr + 18)) = 0.0; // time
-        ptr += POINT_STEP;
-      }
-    }
-  }
-
-  // Populate message with number of valid points
-  msg.data.resize(ptr - msg.data.data()); // Shrink to actual size
   msg.point_step = POINT_STEP;
   msg.is_bigendian = false;
+
+  const double scan_time =
+    static_cast<double>(msg.header.stamp.sec) +
+    static_cast<double>(msg.header.stamp.nanosec) * 1e-9;
+  const double azimuth_duration = (rangeCount > 1) ? yDiff / (rangeCount - 1) : 0.0;
+
   if (organize_cloud_) {
-    msg.width = verticalRangeCount;
-    msg.height = msg.data.size() / POINT_STEP / msg.width;
+    msg.height = static_cast<uint32_t>(rangeCount);
+    msg.width = static_cast<uint32_t>(verticalRangeCount);
     msg.row_step = POINT_STEP * msg.width;
+    msg.data.resize(static_cast<size_t>(rangeCount) * verticalRangeCount * POINT_STEP);
     msg.is_dense = false;
+
+    for (int i = 0; i < rangeCount; i++) {
+      const double yAngle = (rangeCount > 1) ?
+        i * yDiff / (rangeCount - 1) + minAngle.Radian() : minAngle.Radian();
+      const double point_timestamp = scan_time + static_cast<double>(i) * azimuth_duration;
+
+      for (int j = 0; j < verticalRangeCount; j++) {
+        uint8_t * ptr = msg.data.data() +
+          (static_cast<size_t>(i) * verticalRangeCount + j) * POINT_STEP;
+
+        double r = _msg->scan().ranges(i + j * rangeCount);
+        double intensity = _msg->scan().intensities(i + j * rangeCount);
+
+        if (gaussian_noise_ != 0.0) {
+          r += gaussianKernel(0, gaussian_noise_);
+        }
+
+        const double pAngle = (verticalRayCount > 1) ?
+          j * pDiff / (verticalRangeCount - 1) + verticalMinAngle.Radian() :
+          verticalMinAngle.Radian();
+
+        if ((MIN_RANGE < r) && (r < MAX_RANGE) && (intensity >= MIN_INTENSITY)) {
+          *((float*)(ptr + 0)) = static_cast<float>(r * cos(pAngle) * cos(yAngle));
+          *((float*)(ptr + 4)) = static_cast<float>(r * cos(pAngle) * sin(yAngle));
+          *((float*)(ptr + 8)) = static_cast<float>(r * sin(pAngle));
+          *((float*)(ptr + 12)) = static_cast<float>(intensity);
+          *((uint16_t*)(ptr + 16)) = static_cast<uint16_t>(j);
+          *((double*)(ptr + 18)) = point_timestamp;
+        } else {
+          *((float*)(ptr + 0)) = nanf("");
+          *((float*)(ptr + 4)) = nanf("");
+          *((float*)(ptr + 8)) = nanf("");
+          *((float*)(ptr + 12)) = nanf("");
+          *((uint16_t*)(ptr + 16)) = static_cast<uint16_t>(j);
+          *((double*)(ptr + 18)) = point_timestamp;
+        }
+      }
+    }
   } else {
+    msg.data.resize(static_cast<size_t>(rangeCount) * verticalRangeCount * POINT_STEP);
+    uint8_t * out = msg.data.data();
+
+    for (int i = 0; i < rangeCount; i++) {
+      const double yAngle = (rangeCount > 1) ?
+        i * yDiff / (rangeCount - 1) + minAngle.Radian() : minAngle.Radian();
+      const double point_timestamp = scan_time + static_cast<double>(i) * azimuth_duration;
+
+      for (int j = 0; j < verticalRangeCount; j++) {
+        double r = _msg->scan().ranges(i + j * rangeCount);
+        double intensity = _msg->scan().intensities(i + j * rangeCount);
+
+        if ((MIN_RANGE >= r) || (r >= MAX_RANGE) || (intensity < MIN_INTENSITY)) {
+          continue;
+        }
+
+        if (gaussian_noise_ != 0.0) {
+          r += gaussianKernel(0, gaussian_noise_);
+        }
+
+        const double pAngle = (verticalRayCount > 1) ?
+          j * pDiff / (verticalRangeCount - 1) + verticalMinAngle.Radian() :
+          verticalMinAngle.Radian();
+
+        *((float*)(out + 0)) = static_cast<float>(r * cos(pAngle) * cos(yAngle));
+        *((float*)(out + 4)) = static_cast<float>(r * cos(pAngle) * sin(yAngle));
+        *((float*)(out + 8)) = static_cast<float>(r * sin(pAngle));
+        *((float*)(out + 12)) = static_cast<float>(intensity);
+        *((uint16_t*)(out + 16)) = static_cast<uint16_t>(j);
+        *((double*)(out + 18)) = point_timestamp;
+        out += POINT_STEP;
+      }
+    }
+
+    msg.data.resize(out - msg.data.data());
     msg.width = msg.data.size() / POINT_STEP;
     msg.height = 1;
     msg.row_step = msg.data.size();

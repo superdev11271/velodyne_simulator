@@ -52,9 +52,9 @@ Visualization Manager:
           Value: true
         base_link:
           Value: true
-        rs_helios:
+        rslidar:
           Value: true
-        rs_helios_base_link:
+        rslidar_base_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -64,8 +64,8 @@ Visualization Manager:
       Tree:
         base_footprint:
           base_link:
-            rs_helios_base_link:
-              rs_helios:
+            rslidar_base_link:
+              rslidar:
                 {}
       Update Interval: 0
       Value: true
@@ -96,12 +96,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        rs_helios:
+        rslidar:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rs_helios_base_link:
+        rslidar_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
