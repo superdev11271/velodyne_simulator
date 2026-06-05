@@ -34,6 +34,11 @@
     </inertial>
   </link>
 
+  <xacro:include filename="$(find velodyne_description)/urdf/imu.urdf.xacro"/>
+  <xacro:imu parent="base_link" name="imu_link" topic="/imu">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+  </xacro:imu>
+
   <xacro:include filename="$(find velodyne_description)/urdf/RS-Helios-5515.urdf.xacro"/>
   <xacro:RS-Helios-5515 parent="base_link" name="rslidar" topic="/rslidar_points" organize_cloud="${organize_cloud}" hz="10" samples="1800" gpu="${gpu}">
     <origin xyz="0 0 0.4" rpy="0 0 0" />
