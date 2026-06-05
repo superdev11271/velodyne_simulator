@@ -134,7 +134,7 @@ Visualization Manager:
       Selectable: true
       Size (Pixels): 5
       Size (m): 0.009999999776482582
-      Style: Points
+      Style: Squares
       Topic:
         Depth: 5
         Durability Policy: Volatile
