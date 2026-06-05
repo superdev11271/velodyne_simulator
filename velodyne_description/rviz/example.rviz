@@ -52,13 +52,9 @@ Visualization Manager:
           Value: true
         base_link:
           Value: true
-        velodyne:
+        rs_helios:
           Value: true
-        velodyne2:
-          Value: true
-        velodyne2_base_link:
-          Value: true
-        velodyne_base_link:
+        rs_helios_base_link:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -68,11 +64,8 @@ Visualization Manager:
       Tree:
         base_footprint:
           base_link:
-            velodyne2_base_link:
-              velodyne2:
-                {}
-            velodyne_base_link:
-              velodyne:
+            rs_helios_base_link:
+              rs_helios:
                 {}
       Update Interval: 0
       Value: true
@@ -103,22 +96,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        velodyne:
+        rs_helios:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        velodyne2:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        velodyne2_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
-        velodyne_base_link:
+        rs_helios_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -143,46 +126,13 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 13
-      Min Color: 0; 0; 0
-      Min Intensity: 0
-      Name: VLP-16
-      Position Transformer: XYZ
-      Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.009999999776482582
-      Style: Points
-      Topic:
-        Depth: 5
-        Durability Policy: Volatile
-        History Policy: Keep Last
-        Reliability Policy: Reliable
-        Value: /velodyne_points
-      Use Fixed Frame: true
-      Use rainbow: true
-      Value: true
-    - Alpha: 1
-      Autocompute Intensity Bounds: true
-      Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
-        Value: true
-      Axis: Z
-      Channel Name: ring
-      Class: rviz_default_plugins/PointCloud2
-      Color: 255; 255; 255
-      Color Transformer: Intensity
-      Decay Time: 0
-      Enabled: false
-      Invert Rainbow: false
-      Max Color: 255; 255; 255
       Max Intensity: 22
       Min Color: 0; 0; 0
       Min Intensity: 0
-      Name: HDL-32E
+      Name: RS-Helios-5515
       Position Transformer: XYZ
       Selectable: true
-      Size (Pixels): 3
+      Size (Pixels): 5
       Size (m): 0.009999999776482582
       Style: Points
       Topic:
@@ -190,10 +140,10 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /velodyne_points2
+        Value: /rslidar_points
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

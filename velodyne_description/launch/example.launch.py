@@ -36,7 +36,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, EmitEvent, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, GroupAction, IncludeLaunchDescription, EmitEvent, RegisterEventHandler, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
@@ -81,13 +81,20 @@ def generate_launch_description():
       '-topic', 'robot_description',
     ],
     output='screen',
+    parameters=[{'use_sim_time': True}],
   )
 
   start_rviz_cmd = Node(
     package='rviz2',
     executable='rviz2',
     arguments=['-d', rviz_config_file],
-    output='screen'
+    output='screen',
+    parameters=[{'use_sim_time': True}],
+  )
+
+  kill_stale_gazebo_cmd = ExecuteProcess(
+    cmd=['bash', '-c', 'killall gzserver gzclient rviz2 robot_state_publisher 2>/dev/null || true; sleep 1'],
+    output='screen',
   )
 
   exit_event_handler = RegisterEventHandler(
@@ -108,16 +115,28 @@ def generate_launch_description():
     launch_arguments={'world' : world, 'gui' : gui}.items()
   )
 
+  simulation = GroupAction([
+    start_gazebo,
+    start_robot_state_publisher_cmd,
+    TimerAction(period=5.0, actions=[spawn_example_cmd]),
+    TimerAction(period=10.0, actions=[start_rviz_cmd]),
+  ])
+
+  start_simulation = RegisterEventHandler(
+    event_handler=OnProcessExit(
+      target_action=kill_stale_gazebo_cmd,
+      on_exit=[simulation],
+    )
+  )
+
   ld = LaunchDescription()
 
   # Add the actions
   ld.add_action(declare_gpu_cmd)
   ld.add_action(declare_organize_cloud_cmd)
   ld.add_action(declare_gui_cmd)
-  ld.add_action(start_gazebo)
-  ld.add_action(start_robot_state_publisher_cmd)
-  ld.add_action(spawn_example_cmd)
-  ld.add_action(start_rviz_cmd)
+  ld.add_action(kill_stale_gazebo_cmd)
+  ld.add_action(start_simulation)
   ld.add_action(exit_event_handler)
 
   return ld

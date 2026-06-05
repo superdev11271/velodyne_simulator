@@ -3,7 +3,7 @@ project(velodyne_description)
 
 find_package(ament_cmake REQUIRED)
 
-install(DIRECTORY launch meshes rviz urdf world
+install(DIRECTORY launch rviz urdf world
   DESTINATION share/${PROJECT_NAME}
 )
 
