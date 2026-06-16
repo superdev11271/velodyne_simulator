@@ -86,6 +86,9 @@ namespace gazebo
     /// \brief the intensity beneath which points will be filtered
     private: double min_intensity_;
 
+    /// \brief True when parent sensor is a GpuRaySensor (gpu_ray in SDF)
+    private: bool is_gpu_ray_;
+
     /// \brief Minimum range to publish
     private: double min_range_;
 

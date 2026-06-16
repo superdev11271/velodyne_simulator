@@ -36,8 +36,12 @@
 #include <gazebo_ros/utils.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <vector>
 
 #include <gazebo/sensors/Sensor.hh>
+#include <gazebo/sensors/GpuRaySensor.hh>
 static_assert(GAZEBO_MAJOR_VERSION >= 11, "Gazebo version is too old");
 
 
@@ -48,7 +52,8 @@ GZ_REGISTER_SENSOR_PLUGIN(GazeboRosVelodyneLaser)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Constructor
-GazeboRosVelodyneLaser::GazeboRosVelodyneLaser() : min_range_(0), max_range_(0), gaussian_noise_(0)
+GazeboRosVelodyneLaser::GazeboRosVelodyneLaser()
+  : min_range_(0), is_gpu_ray_(false), max_range_(0), gaussian_noise_(0)
 {
 }
 
@@ -73,6 +78,12 @@ void GazeboRosVelodyneLaser::Load(sensors::SensorPtr _parent, sdf::ElementPtr _s
 
   // Get the parent ray sensor
   parent_ray_sensor_ = _parent;
+  is_gpu_ray_ = (std::dynamic_pointer_cast<sensors::GpuRaySensor>(parent_ray_sensor_) != nullptr);
+  if (is_gpu_ray_) {
+    RCLCPP_INFO(
+      ros_node_->get_logger(),
+      "GpuRay sensor detected; using xy-plane range conversion for point cloud");
+  }
 
   // Sets the frame name to either the supplied name, or the name of the sensor
   std::string tf_prefix = _sdf->Get<std::string>("tf_prefix", std::string("")).first;
@@ -200,6 +211,20 @@ void GazeboRosVelodyneLaser::OnScan(ConstLaserScanStampedPtr& _msg)
   msg.fields[5].count = 1;
   msg.data.resize(verticalRangeCount * rangeCount * POINT_STEP);
 
+  // GpuRay can return inconsistent ranges across rings at the same azimuth.
+  // Use the center ring's range for xy projection at each horizontal sample.
+  std::vector<double> gpu_ref_range;
+  if (is_gpu_ray_) {
+    gpu_ref_range.assign(rangeCount, std::numeric_limits<double>::quiet_NaN());
+    const int mid_j = verticalRangeCount / 2;
+    for (int hi = 0; hi < rangeCount; ++hi) {
+      const double rr = _msg->scan().ranges(hi + mid_j * rangeCount);
+      if ((MIN_RANGE < rr) && (rr < MAX_RANGE)) {
+        gpu_ref_range[hi] = rr;
+      }
+    }
+  }
+
   int i, j;
   uint8_t *ptr = msg.data.data();
   for (i = 0; i < rangeCount; i++) {
@@ -240,9 +265,21 @@ void GazeboRosVelodyneLaser::OnScan(ConstLaserScanStampedPtr& _msg)
 
       // pAngle is rotated by yAngle:
       if ((MIN_RANGE < r) && (r < MAX_RANGE)) {
-        *((float*)(ptr + 0)) = r * cos(pAngle) * cos(yAngle); // x
-        *((float*)(ptr + 4)) = r * cos(pAngle) * sin(yAngle); // y
-        *((float*)(ptr + 8)) = r * sin(pAngle); // z
+        if (is_gpu_ray_) {
+          // Gazebo gpu_ray returns xy-plane range. Outer rings can still be wrong,
+          // so share the center-ring range for each azimuth column.
+          double d = gpu_ref_range[i];
+          if (std::isnan(d)) {
+            d = r;
+          }
+          *((float*)(ptr + 0)) = d * cos(yAngle); // x
+          *((float*)(ptr + 4)) = d * sin(yAngle); // y
+          *((float*)(ptr + 8)) = d * tan(pAngle); // z
+        } else {
+          *((float*)(ptr + 0)) = r * cos(pAngle) * cos(yAngle); // x
+          *((float*)(ptr + 4)) = r * cos(pAngle) * sin(yAngle); // y
+          *((float*)(ptr + 8)) = r * sin(pAngle); // z
+        }
         *((float*)(ptr + 12)) = intensity; // intensity
         *((uint16_t*)(ptr + 16)) = j; // ring
         *((float*)(ptr + 18)) = 0.0; // time

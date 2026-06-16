@@ -9,25 +9,25 @@
     <include>
       <uri>model://ground_plane</uri>
     </include>
-    <!-- A unit box -->
-    <model name='unit_box_0_0'>
-      <pose frame=''>-1.5 2.5 0.5 0 -0 0</pose>
+    <!-- Wall: 1 m thick (x), 200 m long (y), 100 m tall (z); near face at x = 10 m -->
+    <model name='wall_box'>
+      <pose frame=''>10.5 0 50 0 0 0</pose>
       <link name='link'>
         <inertial>
           <mass>1</mass>
           <inertia>
-            <ixx>0.166667</ixx>
+            <ixx>833333.333</ixx>
             <ixy>0</ixy>
             <ixz>0</ixz>
-            <iyy>0.166667</iyy>
+            <iyy>833.333</iyy>
             <iyz>0</iyz>
-            <izz>0.166667</izz>
+            <izz>3333.333</izz>
           </inertia>
         </inertial>
         <collision name='collision'>
           <geometry>
             <box>
-              <size>1 1 1</size>
+              <size>1 200 100</size>
             </box>
           </geometry>
           <max_contacts>10</max_contacts>
@@ -47,7 +47,7 @@
         <visual name='visual'>
           <geometry>
             <box>
-              <size>1 1 1</size>
+              <size>1 200 100</size>
             </box>
           </geometry>
           <material>

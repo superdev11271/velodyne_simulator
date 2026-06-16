@@ -36,7 +36,7 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, EmitEvent, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription, EmitEvent, RegisterEventHandler, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
@@ -114,9 +114,15 @@ def generate_launch_description():
   ld.add_action(declare_gpu_cmd)
   ld.add_action(declare_organize_cloud_cmd)
   ld.add_action(declare_gui_cmd)
+  # Gazebo can take longer than spawn_entity's 30s service wait on WSL2 / GPU setups.
+  delayed_spawn_example_cmd = TimerAction(
+    period=15.0,
+    actions=[spawn_example_cmd],
+  )
+
   ld.add_action(start_gazebo)
   ld.add_action(start_robot_state_publisher_cmd)
-  ld.add_action(spawn_example_cmd)
+  ld.add_action(delayed_spawn_example_cmd)
   ld.add_action(start_rviz_cmd)
   ld.add_action(exit_event_handler)
 
