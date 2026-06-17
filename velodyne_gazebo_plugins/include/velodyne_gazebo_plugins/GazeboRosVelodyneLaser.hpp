@@ -47,6 +47,11 @@
 
 #include <gazebo_ros/node.hpp>
 
+#include <cmath>
+#include <mutex>
+#include <string>
+#include <vector>
+
 namespace gazebo
 {
 
@@ -95,15 +100,48 @@ namespace gazebo
     /// \brief Gaussian noise
     private: double gaussian_noise_;
 
-    /// \brief Gaussian noise generator
-    private: static double gaussianKernel(double mu, double sigma)
-    {
-      // using Box-Muller transform to generate two independent standard normally distributed normal variables
-      // see wikipedia
-      double U = (double)rand() / (double)RAND_MAX; // normalized uniform random variable
-      double V = (double)rand() / (double)RAND_MAX; // normalized uniform random variable
-      return sigma * (sqrt(-2.0 * ::log(U)) * cos(2.0 * M_PI * V)) + mu;
-    }
+    /// \brief Scale intensity by distance: retro * (ref_range / range)^exponent
+    private: bool use_distance_intensity_;
+    private: double intensity_reference_range_;
+    private: double intensity_distance_exponent_;
+
+    private: float ComputeIntensity(double range, double material_retro) const;
+    private: static bool IsRangeValid(double range, double min_range, double max_range);
+
+    /// \brief OpenMP threads: 1 = serial (fastest for typical lidars), >1 = parallel
+    /// when point count is large enough, 0 = auto
+    private: int omp_threads_;
+    private: static constexpr int kMinPointsForParallel = 100000;
+    private: bool ShouldUseOpenMP(int total_points) const;
+    private: int EffectiveOpenMPThreads() const;
+
+    /// \brief Reusable PointCloud2 buffer and scan caches
+    private: static constexpr uint32_t kPointStep = 26;
+    private: sensor_msgs::msg::PointCloud2 cloud_;
+    private: std::vector<double> cos_yaw_;
+    private: std::vector<double> sin_yaw_;
+    private: std::vector<double> cos_pitch_;
+    private: std::vector<double> sin_pitch_;
+    private: std::vector<double> azimuth_timestamps_;
+    private: int angle_table_range_count_ = 0;
+    private: int angle_table_vertical_count_ = 0;
+
+    private: void InitCloudTemplate();
+    private: void UpdateAngleTables(
+      int range_count, int vertical_count,
+      double min_yaw, double yaw_step,
+      double min_pitch, double pitch_step);
+    private: static bool IsReturnValid(
+      double range, double intensity,
+      double min_range, double max_range, double min_intensity);
+    private: void FillOrganizedCloud(
+      const msgs::LaserScan & scan,
+      int range_count, int vertical_count,
+      double min_range, double max_range);
+    private: void FillUnorganizedCloud(
+      const msgs::LaserScan & scan,
+      int range_count, int vertical_count,
+      double min_range, double max_range);
 
     /// \brief A mutex to lock access
     private: std::mutex lock_;
@@ -116,13 +154,10 @@ namespace gazebo
     /// \brief Re-implementation of old tf::resolve
     private: static std::string tf_resolve(const std::string& prefix, const std::string& frame_id)
     {
-      std::string output;
       if (prefix.empty()) {
-        output = frame_id;
-      } else {
-        output = prefix + "/" + frame_id;
+        return frame_id;
       }
-      return output;
+      return prefix + "/" + frame_id;
     }
   };
 

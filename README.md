@@ -36,8 +36,17 @@ URDF description and Gazebo plugins to simulate Velodyne laser scanners
 * ```noise``` Gausian noise value in meters. Default ```0.008```
 * ```min_angle``` Minimum horizontal angle in radians. Default ```-3.14```
 * ```max_angle``` Maximum horizontal angle in radians. Default ```3.14```
+* ```min_intensity``` Drop points below this intensity (default: no clipping). Intensity is passed through from Gazebo `laser_retro` without modification.
 * ```gpu``` Use gpu_ray sensor instead of the standard ray sensor. Default ```false```
-* ```min_intensity``` The minimum intensity beneath which returns will be clipped.  Can be used to remove low-intensity objects.
+* ```threads``` Point cloud conversion threads: ```1``` = serial (fastest for typical lidars), ```>1``` = OpenMP when point count exceeds 100k, ```0``` = auto. Default ```1```
+
+## CPU ray intensity (`gpu:=false`)
+
+By default (`use_distance_intensity:=true`), intensity is:
+
+`material_retro * (intensity_reference_range / range) ^ intensity_distance_exponent`
+
+where `material_retro` is Gazebo's per-collision `laser_retro`. Set `use_distance_intensity:=false` to pass Gazebo intensity through unchanged. `gaussian_noise` affects **range only**.
 
 # Known Issues
 * At full sample resolution, Gazebo can take up to 30 seconds to load the VLP-16 plugin, 60 seconds for the HDL-32E

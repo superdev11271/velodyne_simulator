@@ -7,6 +7,10 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic")
+  if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+  endif()
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 endif()
 
 find_package(ament_cmake REQUIRED)
@@ -15,6 +19,11 @@ find_package(gazebo_ros REQUIRED)
 find_package(gazebo_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
+
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+  message(STATUS "velodyne_gazebo_plugins: OpenMP enabled for point cloud conversion")
+endif()
 
 add_library(gazebo_ros_velodyne_laser SHARED
   src/GazeboRosVelodyneLaser.cpp
@@ -30,6 +39,9 @@ target_include_directories(gazebo_ros_velodyne_laser PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(gazebo_ros_velodyne_laser OpenMP::OpenMP_CXX)
+endif()
 
 install(TARGETS
   gazebo_ros_velodyne_laser
