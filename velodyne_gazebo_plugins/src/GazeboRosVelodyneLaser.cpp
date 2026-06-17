@@ -194,22 +194,26 @@ void GazeboRosVelodyneLaser::UpdateAngleTables(
   }
 }
 
-bool GazeboRosVelodyneLaser::IsRangeValid(
-  const double range,
-  const double min_range,
-  const double max_range)
-{
-  return (min_range < range) && (range < max_range);
-}
-
 bool GazeboRosVelodyneLaser::IsReturnValid(
   const double range,
-  const double intensity,
+  const double material_retro,
   const double min_range,
-  const double max_range,
-  const double min_intensity)
+  const double max_range) const
 {
-  return (min_range < range) && (range < max_range) && (intensity >= min_intensity);
+  if (!std::isfinite(range)) {
+    return false;
+  }
+  if (!(min_range < range && range < max_range)) {
+    return false;
+  }
+  // Gazebo reports zero intensity for rays that miss all geometry.
+  if (material_retro <= 0.0) {
+    return false;
+  }
+  if (!use_distance_intensity_ && material_retro < min_intensity_) {
+    return false;
+  }
+  return true;
 }
 
 float GazeboRosVelodyneLaser::ComputeIntensity(
@@ -219,11 +223,10 @@ float GazeboRosVelodyneLaser::ComputeIntensity(
     return static_cast<float>(material_retro);
   }
 
-  const double retro = material_retro > 0.0 ? material_retro : 1.0;
   const double safe_range = std::max(range, 0.1);
   const double distance_factor = std::pow(
     intensity_reference_range_ / safe_range, intensity_distance_exponent_);
-  return static_cast<float>(retro * distance_factor);
+  return static_cast<float>(material_retro * distance_factor);
 }
 
 bool GazeboRosVelodyneLaser::ShouldUseOpenMP(const int total_points) const
@@ -262,7 +265,6 @@ void GazeboRosVelodyneLaser::FillOrganizedCloud(
   cloud_.data.resize(static_cast<size_t>(range_count) * vertical_count * kPointStep);
   cloud_.is_dense = false;
 
-  const double min_intensity = min_intensity_;
   const float nan_value = std::numeric_limits<float>::quiet_NaN();
   const int total_points = range_count * vertical_count;
   const bool use_parallel = ShouldUseOpenMP(total_points);
@@ -286,15 +288,23 @@ void GazeboRosVelodyneLaser::FillOrganizedCloud(
         range += GaussianNoise(gaussian_noise_);
       }
 
-      const float intensity = ComputeIntensity(range, material_retro);
-
       const double cos_p = cos_pitch_[j];
       const double sin_p = sin_pitch_[j];
       const double cos_y = cos_yaw_[i];
       const double sin_y = sin_yaw_[i];
       const double timestamp = azimuth_timestamps_[i];
 
-      if (IsRangeValid(range, min_range, max_range) && intensity >= min_intensity) {
+      if (IsReturnValid(range, material_retro, min_range, max_range)) {
+        const float intensity = ComputeIntensity(range, material_retro);
+        if (use_distance_intensity_ && intensity < min_intensity_) {
+          *reinterpret_cast<float *>(ptr + 0) = nan_value;
+          *reinterpret_cast<float *>(ptr + 4) = nan_value;
+          *reinterpret_cast<float *>(ptr + 8) = nan_value;
+          *reinterpret_cast<float *>(ptr + 12) = nan_value;
+          *reinterpret_cast<uint16_t *>(ptr + 16) = static_cast<uint16_t>(j);
+          *reinterpret_cast<double *>(ptr + 18) = timestamp;
+          continue;
+        }
         *reinterpret_cast<float *>(ptr + 0) = static_cast<float>(range * cos_p * cos_y);
         *reinterpret_cast<float *>(ptr + 4) = static_cast<float>(range * cos_p * sin_y);
         *reinterpret_cast<float *>(ptr + 8) = static_cast<float>(range * sin_p);
@@ -322,7 +332,6 @@ void GazeboRosVelodyneLaser::FillUnorganizedCloud(
   cloud_.height = 1;
   cloud_.is_dense = true;
 
-  const double min_intensity = min_intensity_;
   uint8_t * out = cloud_.data.data();
   const uint8_t * const out_begin = out;
 
@@ -332,19 +341,16 @@ void GazeboRosVelodyneLaser::FillUnorganizedCloud(
       double range = scan.ranges(index);
       const double material_retro = scan.intensities(index);
 
-      if (!IsRangeValid(range, min_range, max_range)) {
-        continue;
-      }
-      if (!use_distance_intensity_ && material_retro < min_intensity) {
-        continue;
-      }
-
       if (gaussian_noise_ != 0.0) {
         range += GaussianNoise(gaussian_noise_);
       }
 
+      if (!IsReturnValid(range, material_retro, min_range, max_range)) {
+        continue;
+      }
+
       const float intensity = ComputeIntensity(range, material_retro);
-      if (intensity < min_intensity) {
+      if (use_distance_intensity_ && intensity < min_intensity_) {
         continue;
       }
 

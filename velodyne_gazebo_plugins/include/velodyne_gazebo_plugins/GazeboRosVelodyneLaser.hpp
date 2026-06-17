@@ -106,7 +106,9 @@ namespace gazebo
     private: double intensity_distance_exponent_;
 
     private: float ComputeIntensity(double range, double material_retro) const;
-    private: static bool IsRangeValid(double range, double min_range, double max_range);
+    private: bool IsReturnValid(
+      double range, double material_retro,
+      double min_range, double max_range) const;
 
     /// \brief OpenMP threads: 1 = serial (fastest for typical lidars), >1 = parallel
     /// when point count is large enough, 0 = auto
@@ -131,9 +133,6 @@ namespace gazebo
       int range_count, int vertical_count,
       double min_yaw, double yaw_step,
       double min_pitch, double pitch_step);
-    private: static bool IsReturnValid(
-      double range, double intensity,
-      double min_range, double max_range, double min_intensity);
     private: void FillOrganizedCloud(
       const msgs::LaserScan & scan,
       int range_count, int vertical_count,

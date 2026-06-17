@@ -46,7 +46,7 @@ By default (`use_distance_intensity:=true`), intensity is:
 
 `material_retro * (intensity_reference_range / range) ^ intensity_distance_exponent`
 
-where `material_retro` is Gazebo's per-collision `laser_retro`. Set `use_distance_intensity:=false` to pass Gazebo intensity through unchanged. `gaussian_noise` affects **range only**.
+where `material_retro` is Gazebo's per-collision `laser_retro`. Rays that miss all geometry report `material_retro=0` and are written as NaN in organized mode (or omitted when `organize_cloud:=false`). Set `use_distance_intensity:=false` to pass Gazebo intensity through unchanged. `gaussian_noise` affects **range only**.
 
 # Known Issues
 * At full sample resolution, Gazebo can take up to 30 seconds to load the VLP-16 plugin, 60 seconds for the HDL-32E
